@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="1. wrappersmicrok8s-start.wrapper 分析 判断$&amp;#123;SNAP_DATA&amp;#125;&#x2F;var&#x2F;lock&#x2F;clustered.lock是否存在  若存在，提示使用snap start microk8s  使用snap start microk8s --enable  –enable: 当机子重启时，snap服务会重新启动microk8s  判断是否存在$&amp;#12">
+<meta property="og:type" content="article">
+<meta property="og:title" content="microk8s resource analysis">
+<meta property="og:url" content="http://example.com/2021/01/09/microk8s-resource-analysis/index.html">
+<meta property="og:site_name" content="hvoid code">
+<meta property="og:description" content="1. wrappersmicrok8s-start.wrapper 分析 判断$&amp;#123;SNAP_DATA&amp;#125;&#x2F;var&#x2F;lock&#x2F;clustered.lock是否存在  若存在，提示使用snap start microk8s  使用snap start microk8s --enable  –enable: 当机子重启时，snap服务会重新启动microk8s  判断是否存在$&amp;#12">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-01-09T01:05:53.000Z">
+<meta property="article:modified_time" content="2021-05-09T14:17:08.690Z">
+<meta property="article:author" content="Wong Chak Chau">
+<meta property="article:tag" content="microk8s">
+<meta name="twitter:card" content="summary">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>microk8s resource analysis</title>
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+		<script type="text/x-mathjax-config">
+		  MathJax.Hub.Config({
+			tex2jax: {
+			  skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+			  inlineMath: [['$','$']]
+			}
+		  });
+		</script>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML' async></script>
+	
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" "Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" aria-label="Previous post " href="/2021/01/09/echo-shell-%E4%B8%AD%E7%9A%84%E7%89%B9%E6%AE%8A%E5%8F%98%E9%87%8F/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" aria-label="Next post " href="/2020/06/06/Docker-Source-Code-Analysis-1/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top " href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post " href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2021/01/09/microk8s-resource-analysis/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2021/01/09/microk8s-resource-analysis/&text=microk8s resource analysis"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2021/01/09/microk8s-resource-analysis/&is_video=false&description=microk8s resource analysis"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=microk8s resource analysis&body=Check out this article: http://example.com/2021/01/09/microk8s-resource-analysis/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2021/01/09/microk8s-resource-analysis/&name=microk8s resource analysis&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2021/01/09/microk8s-resource-analysis/&t=microk8s resource analysis"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#1-wrappers"><span class="toc-number">1.</span> <span class="toc-text">1. wrappers</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#microk8s-start-wrapper-%E5%88%86%E6%9E%90"><span class="toc-number">1.1.</span> <span class="toc-text">microk8s-start.wrapper 分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#microk8s-add-node-wrapper"><span class="toc-number">1.2.</span> <span class="toc-text">microk8s-add-node.wrapper</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#microk8s-join-node-wrapper"><span class="toc-number">1.3.</span> <span class="toc-text">microk8s-join-node.wrapper</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#2-action"><span class="toc-number">2.</span> <span class="toc-text">2. action&#x2F;</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-common-utils-sh"><span class="toc-number">2.1.</span> <span class="toc-text">2.1 common&#x2F;utils.sh</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2Reference"><span class="toc-number">2.2.</span> <span class="toc-text">2.2Reference</span></a></li></ol></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        microk8s resource analysis
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">Wong Chak Chau</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2021-01-09T01:05:53.000Z" itemprop="datePublished">2021-01-09</time>
+        
+      
+    </div>
+
+
+      
+
+      
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link-link" href="/tags/microk8s/" rel="tag">microk8s</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h1 id="1-wrappers"><a href="#1-wrappers" class="headerlink" title="1. wrappers"></a>1. wrappers</h1><h2 id="microk8s-start-wrapper-分析"><a href="#microk8s-start-wrapper-分析" class="headerlink" title="microk8s-start.wrapper 分析"></a>microk8s-start.wrapper 分析</h2><ul>
+<li><p>判断<code>$&#123;SNAP_DATA&#125;/var/lock/clustered.lock</code>是否存在</p>
+</li>
+<li><p>若存在，提示使用<code>snap start microk8s</code></p>
+</li>
+<li><p>使用<code>snap start microk8s --enable</code></p>
+</li>
+<li><p>–enable: 当机子重启时，snap服务会重新启动microk8s</p>
+</li>
+<li><p>判断是否存在<code>$&#123;SNAP_DATA&#125;/var/lock/stopped.lock</code></p>
+</li>
+<li><p>若存在，移除该文件。则说明api server在运行</p>
+</li>
+<li><p>执行<code>wait_for_node</code></p>
+</li>
+<li><p>输出<code>kubectl get node</code>的结果</p>
+</li>
+</ul>
+<h2 id="microk8s-add-node-wrapper"><a href="#microk8s-add-node-wrapper" class="headerlink" title="microk8s-add-node.wrapper"></a>microk8s-add-node.wrapper</h2><ul>
+<li><p><a href="./echo+shell-special-variables.md">shell set review</a></p>
+</li>
+<li><p><code>set -eu</code>: <code>-e</code> 使得脚本只要发生错误，就终止执行; <code>-u</code> 执行脚本的时候，如果遇到不存在的变量，Bash 名默认忽略它。</p>
+</li>
+<li><p>若当前存在<code>$&#123;SNAP_DATA&#125;/var/lock/clustered.lock</code>，则不执行并提示在master执行</p>
+</li>
+<li><p>获取ca.crt的subject</p>
+<ul>
+<li>若subject为127.0.0.1，报错</li>
+</ul>
+</li>
+<li><p>若不存在文件<code>$SNAP_DATA/credentials/cluster-tokens.txt</code>,创建一个</p>
+</li>
+<li><p>若存在microk8s group，将<code>$SNAP_DATA/credentials/cluster-tokens.txt</code>的group设为microk8s</p>
+<ul>
+<li>对于&amp; 1 更准确的说应该是文件描述符 1,而1标识标准输出，stdout。</li>
+<li>对于2 ，表示标准错误，stderr。</li>
+<li>2&gt;&amp;1 的意思就是将标准错误重定向到标准输出。这里标准输出已经重定向到了 /dev/null。那么标准错误也会输出到/dev/null</li>
+</ul>
+</li>
+<li><p>生成token–跑<a href="./microk8s-scripts-analysis.md">add_token.py</a></p>
+</li>
+<li><p>保存当前IFS（Internal Field Separator）</p>
+</li>
+</ul>
+<pre class="line-numbers language-shell" data-language="shell"><code class="language-shell">$ echo $IFS
+
+$ echo &quot;$IFS&quot; | od -b
+0000000 040 011 012 012
+0000004
+
+&quot;040&quot;是空格，&quot;011&quot;是Tab，&quot;012&quot;是换行符&quot;\n&quot; <span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<ul>
+<li>获取token</li>
+<li>还原IFS</li>
+<li>若<code>$&#123;SNAP_DATA&#125;&quot;/args/cluster-agent</code>中存在”25000”, 设port为cluster-agent中的第二个字段</li>
+<li>输出join node的结果</li>
+</ul>
+<h2 id="microk8s-join-node-wrapper"><a href="#microk8s-join-node-wrapper" class="headerlink" title="microk8s-join-node.wrapper"></a>microk8s-join-node.wrapper</h2><h1 id="2-action"><a href="#2-action" class="headerlink" title="2. action/"></a>2. action/</h1><h2 id="2-1-common-utils-sh"><a href="#2-1-common-utils-sh" class="headerlink" title="2.1 common/utils.sh"></a>2.1 common/utils.sh</h2><p><strong>get_opt_in_config()</strong></p>
+<ul>
+<li>在<code>/var/snap/microk8s/current/args</code>路径下获取</li>
+</ul>
+<hr>
+<p><strong>restart_service()</strong></p>
+<ul>
+<li><p>重启本机daemon-XXXX service</p>
+</li>
+<li><p>查看是否存在文件<code>$&#123;SNAP_DATA&#125;/var/lock/ha-cluster</code></p>
+</li>
+<li><p>若存在，执行<code>distributed_op.py</code></p>
+</li>
+<li><p>查看是否存在<code>$&#123;SNAP_DATA&#125;/credentials/callback-tokens.txt</code></p>
+</li>
+<li><p>若存在，执行<code>distributed_op.py</code></p>
+</li>
+<li><p>（callback token为join另一node时所带来的）</p>
+</li>
+</ul>
+<hr>
+<p><strong>get_defualt_ip()</strong></p>
+<pre class="line-numbers language-bash" data-language="bash"><code class="language-bash"><span class="token function-name function">get_default_ip</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">&#123;</span>
+
+<span class="token comment"># Get the IP of the default interface</span>
+
+<span class="token builtin class-name">local</span> <span class="token assign-left variable">DEFAULT_INTERFACE</span><span class="token operator">=</span><span class="token string">"<span class="token variable"><span class="token variable">$(</span>$SNAP/bin/netstat -rn <span class="token operator">|</span> $SNAP/bin/grep <span class="token string">'^0.0.0.0'</span> <span class="token operator">|</span> $SNAP/usr/bin/gawk <span class="token string">'&#123;print <span class="token variable">$NF</span>&#125;'</span> <span class="token operator">|</span> <span class="token function">head</span> -1<span class="token variable">)</span></span>"</span>
+
+<span class="token comment"># Get default interface's ip</span>
+
+<span class="token builtin class-name">local</span> <span class="token assign-left variable">IP_ADDR</span><span class="token operator">=</span><span class="token string">"<span class="token variable"><span class="token variable">$(</span>$SNAP/sbin/ip -o -4 addr list <span class="token string">"<span class="token variable">$DEFAULT_INTERFACE</span>"</span> <span class="token operator">|</span> $SNAP/usr/bin/gawk <span class="token string">'&#123;print <span class="token variable">$4</span>&#125;'</span> <span class="token operator">|</span> $SNAP/usr/bin/cut -d/ -f1 <span class="token operator">|</span> <span class="token function">head</span> -1<span class="token variable">)</span></span>"</span>
+
+<span class="token keyword">if</span> <span class="token punctuation">[</span><span class="token punctuation">[</span> -z <span class="token string">"<span class="token variable">$IP_ADDR</span>"</span> <span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token operator">></span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token operator">></span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+<span class="token keyword">then</span>
+
+<span class="token builtin class-name">echo</span> <span class="token string">"none"</span>
+
+<span class="token keyword">else</span>
+
+<span class="token builtin class-name">echo</span> <span class="token string">"<span class="token variable">$&#123;IP_ADDR&#125;</span>"</span>
+
+<span class="token keyword">fi</span>
+
+<span class="token punctuation">&#125;</span><span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><code>netstat -rn</code>会返回一系列数据组成的表格</p>
+<pre class="line-numbers language-sh" data-language="sh"><code class="language-sh">Kernel IP routing table
+
+Destination Gateway Genmask Flags MSS Window irtt Iface
+
+0.0.0.0 192.168.1.2 0.0.0.0 UG 0 0 0 ens33
+
+169.254.0.0 0.0.0.0 255.255.0.0 U 0 0 0 ens33
+
+192.168.1.0 0.0.0.0 255.255.255.0 U 0 0 0 ens33<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><code>gawk &#39;&#123;print $NF&#125;&#39; </code>会返回表格的最后一列。</p>
+<p>这是<code>$nf </code>的详细描述</p>
+<pre class="line-numbers language-none"><code class="language-none">NF is a predefined variable whose value is the number of fields in the current record. awk automatically updates the value of NF each time it reads a record. No matter how many fields there are, the last field in a record can be represented by $NF . So, $NF is the same as $7 , which is &#39; example.<span aria-hidden="true" class="line-numbers-rows"><span></span></span></code></pre>
+
+<hr>
+<p><strong>produce_certs()</strong></p>
+<p><a href="./ssl_key_and_certificate.md">SSL Key and Certificate Background</a></p>
+<ul>
+<li><p>基于<code>/snap/microk8s/current/etc/ssl/openssl.cnf</code>来生成key, 存在<code>$SNAP_DATA/certs/</code></p>
+</li>
+<li><p><code>serviceaccounnt.key</code></p>
+</li>
+<li><p><code>ca.key</code></p>
+</li>
+<li><p><code>server.key</code>:</p>
+</li>
+<li><p><code>front-proxy-ca.key</code>：用于apiserver的aggredated layer，（aggregated apiserver）</p>
+</li>
+<li><p><code>front-proxy-client.key</code>：用于apiserver的aggredated layer，（aggregated apiserver）</p>
+</li>
+<li><p>从<code>csr.conf.rendered</code> 更新数据到 <code>csr.conf</code></p>
+</li>
+<li><p>基于<code>ca.key</code> 生成10年的<code>ca.crt</code></p>
+</li>
+<li><p>基于<code>front-proxy-ca.key</code> 生成<strong>10</strong>年的<code>front-proxy-ca.crt</code></p>
+</li>
+<li><p>执行<strong>render_csr_conf()</strong></p>
+</li>
+<li><p>获取csr.conf,从csr.conf.template中添加额外的ip，从$(get_ips)中获取。</p>
+</li>
+<li><p>执行<strong>gen_server_cert()</strong></p>
+</li>
+<li><p>openssl 使用OPENSSL_CONF 环境变量来获取cnf文件。</p>
+</li>
+<li><p>基于<code>server.key</code>, <code>csr.conf</code>生成<code>server.csr</code></p>
+</li>
+<li><p>使用<code>server.csr</code> 和 <code>ca.crt</code>, <code>ca.key</code>的签名生成<strong>1年的</strong><code>server.crt</code> <strong>###</strong></p>
+</li>
+<li><p>执行<strong>gen_proxy_client_cert()</strong></p>
+</li>
+<li><p>同上生成<strong>1年</strong>的<code>front-proxy-client.crt</code> <strong>###</strong></p>
+</li>
+</ul>
+<hr>
+<p><strong>drain_node()</strong></p>
+<ul>
+<li>safely evict all of your pods from a node before you perform maintenance on the node</li>
+</ul>
+<p><strong>uncordon_node()</strong></p>
+<ul>
+<li>mark node as schedulable</li>
+</ul>
+<hr>
+<p><strong>init_cluster()</strong></p>
+<ul>
+<li><p>添加本机IP到<code>$&#123;SNAP_DATA&#125;/var/kubernetes/backend/init.yaml</code></p>
+</li>
+<li><p>将csr-dqlite.conf中的DNS填为本机hostname，IP填为127.0.0.1</p>
+</li>
+<li><p>基于csr-dqlite.conf生成cluster.key和<strong>10年</strong>的cluster.crt</p>
+</li>
+</ul>
+<hr>
+<p><strong>update_configs()</strong></p>
+<ul>
+<li><p>从<code>know_tokens.csv</code>提取token到</p>
+</li>
+<li><p>admin token -&gt; <code>client.config</code></p>
+</li>
+<li><p>controller token-&gt; <code>controller.config</code></p>
+</li>
+<li><p>scheduler token -&gt; <code>scheduler.config</code></p>
+</li>
+<li><p>node token -&gt; <code>kubelet.config</code></p>
+</li>
+<li><p>kube-proxy token -&gt; <code>proxy.config</code></p>
+</li>
+<li><p>执行stop</p>
+</li>
+<li><p>执行start</p>
+</li>
+</ul>
+<h2 id="2-2Reference"><a href="#2-2Reference" class="headerlink" title="2.2Reference"></a>2.2Reference</h2><ol>
+<li><p>[snap environment variables](</p>
+</li>
+<li><p><a target="_blank" rel="noopener" href="https://snapcraft.io/docs/environment-variables">https://snapcraft.io/docs/environment-variables</a>)</p>
+</li>
+</ol>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#1-wrappers"><span class="toc-number">1.</span> <span class="toc-text">1. wrappers</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#microk8s-start-wrapper-%E5%88%86%E6%9E%90"><span class="toc-number">1.1.</span> <span class="toc-text">microk8s-start.wrapper 分析</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#microk8s-add-node-wrapper"><span class="toc-number">1.2.</span> <span class="toc-text">microk8s-add-node.wrapper</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#microk8s-join-node-wrapper"><span class="toc-number">1.3.</span> <span class="toc-text">microk8s-join-node.wrapper</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#2-action"><span class="toc-number">2.</span> <span class="toc-text">2. action&#x2F;</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-common-utils-sh"><span class="toc-number">2.1.</span> <span class="toc-text">2.1 common&#x2F;utils.sh</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2Reference"><span class="toc-number">2.2.</span> <span class="toc-text">2.2Reference</span></a></li></ol></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2021/01/09/microk8s-resource-analysis/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2021/01/09/microk8s-resource-analysis/&text=microk8s resource analysis"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2021/01/09/microk8s-resource-analysis/&is_video=false&description=microk8s resource analysis"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=microk8s resource analysis&body=Check out this article: http://example.com/2021/01/09/microk8s-resource-analysis/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2021/01/09/microk8s-resource-analysis/&title=microk8s resource analysis"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2021/01/09/microk8s-resource-analysis/&name=microk8s resource analysis&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2021/01/09/microk8s-resource-analysis/&t=microk8s resource analysis"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2019-2021
+    Wong Chak Chau
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+ 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script> 
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script> 
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Umami Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>
