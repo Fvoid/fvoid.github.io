@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="LevelDB (2) – cache 缓存机制源码分析LevelDB version 1.23 1. Module Informationutil&#x2F;cache.cc  2. Components2.1 Components Overview struct LRUHandle class HandleTable class LRUCache class SharedLRUCache  The ov">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDB (2) - cache 源码分析">
+<meta property="og:url" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/index.html">
+<meta property="og:site_name" content="hvoid code">
+<meta property="og:description" content="LevelDB (2) – cache 缓存机制源码分析LevelDB version 1.23 1. Module Informationutil&#x2F;cache.cc  2. Components2.1 Components Overview struct LRUHandle class HandleTable class LRUCache class SharedLRUCache  The ov">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png">
+<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_02.PNG">
+<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_03.PNG">
+<meta property="article:published_time" content="2021-05-11T15:41:19.000Z">
+<meta property="article:modified_time" content="2021-05-11T15:43:05.391Z">
+<meta property="article:author" content="Wong Chak Chau">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>LevelDB (2) - cache 源码分析</title>
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+		<script type="text/x-mathjax-config">
+		  MathJax.Hub.Config({
+			tex2jax: {
+			  skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+			  inlineMath: [['$','$']]
+			}
+		  });
+		</script>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML' async></script>
+	
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" "Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        
+        <li><a class="icon" aria-label="Next post " href="/2021/05/09/SSL-Key-and-Certificate-Background-Knowledge/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top " href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post " href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&text=LevelDB (2) - cache 源码分析"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&is_video=false&description=LevelDB (2) - cache 源码分析"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=LevelDB (2) - cache 源码分析&body=Check out this article: http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&name=LevelDB (2) - cache 源码分析&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&t=LevelDB (2) - cache 源码分析"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#LevelDB-2-%E2%80%93-cache-%E7%BC%93%E5%AD%98%E6%9C%BA%E5%88%B6%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="toc-number">1.</span> <span class="toc-text">LevelDB (2) – cache 缓存机制源码分析</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-Module-Information"><span class="toc-number">1.1.</span> <span class="toc-text">1. Module Information</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-Components"><span class="toc-number">1.2.</span> <span class="toc-text">2. Components</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-Components-Overview"><span class="toc-number">1.3.</span> <span class="toc-text">2.1 Components Overview</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2-LRUHandle-struct"><span class="toc-number">1.4.</span> <span class="toc-text">2.2 LRUHandle struct</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-1-Variable-Explanation"><span class="toc-number">1.4.1.</span> <span class="toc-text">2.2.1 Variable Explanation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-2-Method-Explanation"><span class="toc-number">1.4.2.</span> <span class="toc-text">2.2.2 Method Explanation</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#2-2-2-1-function-Slice-key-const-public"><span class="toc-number">1.4.2.1.</span> <span class="toc-text">2.2.2.1 function Slice key() const - public</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-3-HandleTable-class"><span class="toc-number">1.5.</span> <span class="toc-text">2.3 HandleTable class</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-1-Variable-Explanation"><span class="toc-number">1.5.1.</span> <span class="toc-text">2.3.1 Variable Explanation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-2-Method-Explanation"><span class="toc-number">1.5.2.</span> <span class="toc-text">2.3.2 Method Explanation</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-1-function-LRUHandle-FindPointer-const-Slice-amp-key-uint32-t-hash-private"><span class="toc-number">1.5.2.1.</span> <span class="toc-text">2.3.2.1 function LRUHandle** FindPointer(const Slice&amp; key, uint32_t hash) - private</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-2-function-void-Resize-private"><span class="toc-number">1.5.2.2.</span> <span class="toc-text">2.3.2.2 function void Resize() - private</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-3-function-Insert-LRUHandle-h-public"><span class="toc-number">1.5.2.3.</span> <span class="toc-text">2.3.2.3 function Insert( LRUHandle* h) - public</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-4-function-Remove-LRUHandle-h-public"><span class="toc-number">1.5.2.4.</span> <span class="toc-text">2.3.2.4 function Remove( LRUHandle* h) - public</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-4-LRUCache-class"><span class="toc-number">1.6.</span> <span class="toc-text">2.4 LRUCache class</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-1-Variable-Explanation"><span class="toc-number">1.6.1.</span> <span class="toc-text">2.4.1 Variable Explanation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-2-Method-Explanation"><span class="toc-number">1.6.2.</span> <span class="toc-text">2.4.2 Method Explanation</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#Initialization"><span class="toc-number">1.6.2.1.</span> <span class="toc-text">Initialization</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Destruction"><span class="toc-number">1.6.2.2.</span> <span class="toc-text">Destruction</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-1-void-LRU-Remove-LRUHandle-e"><span class="toc-number">1.6.2.3.</span> <span class="toc-text">2.4.2.1 void LRU_Remove(LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-2-void-LRU-Append-LRUHandle-list-LRUHandle-e"><span class="toc-number">1.6.2.4.</span> <span class="toc-text">2.4.2.2 void LRU_Append(LRUHandle* list, LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-3-void-Ref-LRUHandle-e"><span class="toc-number">1.6.2.5.</span> <span class="toc-text">2.4.2.3 void Ref(LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-4-void-Unref-LRUHandle-e"><span class="toc-number">1.6.2.6.</span> <span class="toc-text">2.4.2.4 void Unref(LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-5-LRUCache-Insert-const-Slice-amp-key-uint32-t-hash-void-value-size-t-charge-void-deleter-const-Slice-amp-key-void-value"><span class="toc-number">1.6.2.7.</span> <span class="toc-text">2.4.2.5 LRUCache::Insert(const Slice&amp; key, uint32_t hash, void* value, size_t charge, void (*deleter)(const Slice&amp; key, void* value))</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-6-void-LRUCache-Erase-const-Slice-amp-key-uint32-t-hash"><span class="toc-number">1.6.2.8.</span> <span class="toc-text">2.4.2.6 void LRUCache::Erase(const Slice&amp; key, uint32_t hash)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-7-void-LRUCache-Prune"><span class="toc-number">1.6.2.9.</span> <span class="toc-text">2.4.2.7 void LRUCache::Prune()</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-8-bool-FinishErase-LRUHandle-e"><span class="toc-number">1.6.2.10.</span> <span class="toc-text">2.4.2.8 bool FinishErase(LRUHandle* e)</span></a></li></ol></li></ol></li></ol></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        LevelDB (2) - cache 源码分析
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">Wong Chak Chau</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2021-05-11T15:41:19.000Z" itemprop="datePublished">2021-05-11</time>
+        
+      
+    </div>
+
+
+      
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h1 id="LevelDB-2-–-cache-缓存机制源码分析"><a href="#LevelDB-2-–-cache-缓存机制源码分析" class="headerlink" title="LevelDB (2) – cache 缓存机制源码分析"></a>LevelDB (2) – cache 缓存机制源码分析</h1><p>LevelDB version 1.23</p>
+<h2 id="1-Module-Information"><a href="#1-Module-Information" class="headerlink" title="1. Module Information"></a>1. Module Information</h2><p><code>util/cache.cc</code></p>
+<hr>
+<h2 id="2-Components"><a href="#2-Components" class="headerlink" title="2. Components"></a>2. Components</h2><h2 id="2-1-Components-Overview"><a href="#2-1-Components-Overview" class="headerlink" title="2.1 Components Overview"></a>2.1 Components Overview</h2><ul>
+<li>struct <code>LRUHandle</code></li>
+<li>class <code>HandleTable</code></li>
+<li>class <code>LRUCache</code></li>
+<li>class <code>SharedLRUCache</code></li>
+</ul>
+<p>The overall relationship between them is shown in figure 1.</p>
+<p><img src="./LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png"></p>
+<center>Figure 1. Data Structure Relationship Between LRUHandle and HandleTable</center>
+
+<p>The struct <code>LRUHandle</code> is the basic node for the cache element linked list. The <code>HandleTable</code> contains a list of <code>LRUHandle</code> linked list. The <code>LRUCache</code> class is to implement cache logic using <code>LRUHandle</code> and <code>HandleTable</code>. Thus, the actual cache logic is inside <code>LRUCache</code>.</p>
+<hr>
+<h2 id="2-2-LRUHandle-struct"><a href="#2-2-LRUHandle-struct" class="headerlink" title="2.2 LRUHandle struct"></a>2.2 LRUHandle struct</h2><h3 id="2-2-1-Variable-Explanation"><a href="#2-2-1-Variable-Explanation" class="headerlink" title="2.2.1 Variable Explanation"></a>2.2.1 Variable Explanation</h3><table>
+<thead>
+<tr>
+<th align="center">Field</th>
+<th align="left">Explanation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center"><code>value</code></td>
+<td align="left">a void ptr to actual value address</td>
+</tr>
+<tr>
+<td align="center"><code>deleter</code></td>
+<td align="left">a function ptr of deleting a node from linked list according key and value</td>
+</tr>
+<tr>
+<td align="center"><code>next_hash</code></td>
+<td align="left">ptr to next node on linked list</td>
+</tr>
+<tr>
+<td align="center"><code>next</code></td>
+<td align="left">ptr to next node on linked list</td>
+</tr>
+<tr>
+<td align="center"><code>prev</code></td>
+<td align="left">ptr to previous node on linked list</td>
+</tr>
+<tr>
+<td align="center"><code>charge</code></td>
+<td align="left">node size (opt?)</td>
+</tr>
+<tr>
+<td align="center"><code>key_length</code></td>
+<td align="left">key length of current node</td>
+</tr>
+<tr>
+<td align="center"><code>in_cache</code></td>
+<td align="left">if the node is in cache</td>
+</tr>
+<tr>
+<td align="center"><code>refs</code></td>
+<td align="left">count of reference</td>
+</tr>
+<tr>
+<td align="center"><code>hash</code></td>
+<td align="left">hash value of key; used for fast sharding and comparisons</td>
+</tr>
+<tr>
+<td align="center"><code>key_data</code></td>
+<td align="left">address of beginning of the key</td>
+</tr>
+</tbody></table>
+<h3 id="2-2-2-Method-Explanation"><a href="#2-2-2-Method-Explanation" class="headerlink" title="2.2.2 Method Explanation"></a>2.2.2 Method Explanation</h3><h4 id="2-2-2-1-function-Slice-key-const-public"><a href="#2-2-2-1-function-Slice-key-const-public" class="headerlink" title="2.2.2.1 function Slice key() const - public"></a>2.2.2.1 function <code>Slice key() const</code> - public</h4><p>return the slice type of the key</p>
+<hr>
+<h2 id="2-3-HandleTable-class"><a href="#2-3-HandleTable-class" class="headerlink" title="2.3 HandleTable class"></a>2.3 HandleTable class</h2><p>The linked list in HandleTable class is single way using <code>next_hash</code> field to link.</p>
+<h3 id="2-3-1-Variable-Explanation"><a href="#2-3-1-Variable-Explanation" class="headerlink" title="2.3.1 Variable Explanation"></a>2.3.1 Variable Explanation</h3><table>
+<thead>
+<tr>
+<th align="center">Field</th>
+<th align="left">Explanation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">length_</td>
+<td align="left">length of the <code>list_</code>; number of linked list</td>
+</tr>
+<tr>
+<td align="center">elems_</td>
+<td align="left">total count of nodes in the table</td>
+</tr>
+<tr>
+<td align="center">list_</td>
+<td align="left">list of linked list</td>
+</tr>
+</tbody></table>
+<h3 id="2-3-2-Method-Explanation"><a href="#2-3-2-Method-Explanation" class="headerlink" title="2.3.2 Method Explanation"></a>2.3.2 Method Explanation</h3><h4 id="2-3-2-1-function-LRUHandle-FindPointer-const-Slice-amp-key-uint32-t-hash-private"><a href="#2-3-2-1-function-LRUHandle-FindPointer-const-Slice-amp-key-uint32-t-hash-private" class="headerlink" title="2.3.2.1 function LRUHandle** FindPointer(const Slice&amp; key, uint32_t hash) - private"></a>2.3.2.1 function <code>LRUHandle** FindPointer(const Slice&amp; key, uint32_t hash)</code> - private</h4><ol>
+<li>locate the linked list on list of linked list according to hash value, <code>list_[hash &amp; (length - 1)]</code></li>
+<li>loop through the linked list from the head node<ol>
+<li>check current node is <code>nullptr</code> or not</li>
+<li>compare hash and key (<code>Slice</code> type) value</li>
+<li>if not equal, get next_hash</li>
+</ol>
+</li>
+<li>If not found, function return a ptr to last node’s <code>next_hash</code> whose value is <code>nullptr</code>. If found, return ptr to LRUHandle*</li>
+</ol>
+<h4 id="2-3-2-2-function-void-Resize-private"><a href="#2-3-2-2-function-void-Resize-private" class="headerlink" title="2.3.2.2 function void Resize() - private"></a>2.3.2.2 function <code>void Resize()</code> - private</h4><p>The <code>Resize()</code> function is called during <strong>initialization</strong> of HandleTable and <strong>insertion</strong> when <code>elem_</code> is larger than <code>length_</code> of list of linked list.</p>
+<ol>
+<li>init <code>new_legnth</code> to 4</li>
+<li>multiply <code>new_length</code> by 2 when <code>new_length</code> is smaller than <code>elem_</code> </li>
+<li>new a list <code>new_list</code> with length <code>new_length</code> holding <code>LRUHandle*</code></li>
+<li>set all memory in new_list to 0</li>
+<li>loop through each linked list in <code>list_</code><ol>
+<li>if the first node in linked list is not <code>nullptr</code>, rehash nodes on this linked list to <code>new_list</code></li>
+</ol>
+</li>
+<li>delete <code>list_</code></li>
+<li>assign <code>new_list</code> to <code>list_</code></li>
+</ol>
+<h4 id="2-3-2-3-function-Insert-LRUHandle-h-public"><a href="#2-3-2-3-function-Insert-LRUHandle-h-public" class="headerlink" title="2.3.2.3 function Insert( LRUHandle* h) - public"></a>2.3.2.3 function <code>Insert( LRUHandle* h)</code> - public</h4><ol>
+<li><p>find h in the table</p>
+</li>
+<li><p>when h is not in the table, then the <code>LRUHandle** ptr</code> will point to an address with <code>nullptr</code> value.<br><img src="./LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_02.PNG" alt="cache_02.PNG"></p>
+</li>
+<li><p>put h ptr value to address <code>**ptr</code></p>
+</li>
+</ol>
+<p><img src="./LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_03.PNG" alt="cache_03.PNG"></p>
+<ol start="4">
+<li>increment <code>elems_</code>, if <code>elemes &gt; length_</code>, do resize.</li>
+<li>when h is found with the key, it replaces found LRUHandle* with h.</li>
+</ol>
+<h4 id="2-3-2-4-function-Remove-LRUHandle-h-public"><a href="#2-3-2-4-function-Remove-LRUHandle-h-public" class="headerlink" title="2.3.2.4 function Remove( LRUHandle* h) - public"></a>2.3.2.4 function <code>Remove( LRUHandle* h)</code> - public</h4><p>normal linked list remove operation.</p>
+<hr>
+<h2 id="2-4-LRUCache-class"><a href="#2-4-LRUCache-class" class="headerlink" title="2.4 LRUCache class"></a>2.4 LRUCache class</h2><p><code>LRUCache</code> class uses two head nodes, <code>LRUHandle</code>, to implement LRU cache. One for storing LRU element, the other is as cache list.</p>
+<h3 id="2-4-1-Variable-Explanation"><a href="#2-4-1-Variable-Explanation" class="headerlink" title="2.4.1 Variable Explanation"></a>2.4.1 Variable Explanation</h3><table>
+<thead>
+<tr>
+<th align="center">Field</th>
+<th align="center">Type</th>
+<th align="left">Explanation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">capacity_</td>
+<td align="center"><code>size_t</code></td>
+<td align="left">cache capacity for storing LRUHandle</td>
+</tr>
+<tr>
+<td align="center">mutex_</td>
+<td align="center"><code>Port::Mutex</code></td>
+<td align="left">a custom lock [[leveldb (a) – Port Lock]]</td>
+</tr>
+<tr>
+<td align="center">usage_</td>
+<td align="center"><code>size_t GUARDED_BY(mutex_)</code></td>
+<td align="left">number of LRUHandle* node in cache</td>
+</tr>
+<tr>
+<td align="center">lru_</td>
+<td align="center"><code>LRUHandle GUARDED_BY(mutex_)</code></td>
+<td align="left">head of lru list</td>
+</tr>
+<tr>
+<td align="center">in_use_</td>
+<td align="center"><code>LRUHandle GUARDED_BY(mutex_)</code></td>
+<td align="left">head of lru cache list</td>
+</tr>
+<tr>
+<td align="center">table_</td>
+<td align="center"><code>HandleTable GUARDED_BY(mutex_)</code></td>
+<td align="left"></td>
+</tr>
+</tbody></table>
+<h3 id="2-4-2-Method-Explanation"><a href="#2-4-2-Method-Explanation" class="headerlink" title="2.4.2 Method Explanation"></a>2.4.2 Method Explanation</h3><h4 id="Initialization"><a href="#Initialization" class="headerlink" title="Initialization"></a>Initialization</h4><ul>
+<li>Make empty circular linked lists on value <code>lru_</code> and <code>in_use_</code> seperately.</li>
+</ul>
+<h4 id="Destruction"><a href="#Destruction" class="headerlink" title="Destruction"></a>Destruction</h4><ol>
+<li>check if <code>in_use_</code> points to <code>in_use_.next</code> making sure there is no thread using it.<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">for (LRUHandle* e &#x3D; lru_.next; e !&#x3D; &amp;lru_;) &#123;
+    LRUHandle* next &#x3D; e-&gt;next;
+    assert(e-&gt;in_cache);
+    e-&gt;in_cache &#x3D; false;
+    assert(e-&gt;refs &#x3D;&#x3D; 1);  &#x2F;&#x2F; Invariant of lru_ list.
+    Unref(e);
+    e &#x3D; next; &#x2F;&#x2F; avoid dangling ptr
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre></li>
+<li>loop through <code>lru_</code> list. unreference node from <code>in_use_</code> list</li>
+<li>the <code>LRUHandle</code> on <code>lru_</code> must be in cache</li>
+<li>reference count of <code>LRUHandle</code> must be 1, ensuring only <code>LRUCache</code> is using.</li>
+<li> Unreference it</li>
+<li> assign <code>next</code> to e avoiding dangling pointer</li>
+</ol>
+<h4 id="2-4-2-1-void-LRU-Remove-LRUHandle-e"><a href="#2-4-2-1-void-LRU-Remove-LRUHandle-e" class="headerlink" title="2.4.2.1 void LRU_Remove(LRUHandle* e)"></a>2.4.2.1 <code>void LRU_Remove(LRUHandle* e)</code></h4><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">void LRUCache::LRU_Remove(LRUHandle* e) &#123;
+  e-&gt;next-&gt;prev &#x3D; e-&gt;prev;
+  e-&gt;prev-&gt;next &#x3D; e-&gt;next;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><code>LRUHandle* e</code> is a linked list node.</p>
+<h4 id="2-4-2-2-void-LRU-Append-LRUHandle-list-LRUHandle-e"><a href="#2-4-2-2-void-LRU-Append-LRUHandle-list-LRUHandle-e" class="headerlink" title="2.4.2.2 void LRU_Append(LRUHandle* list, LRUHandle* e)"></a>2.4.2.2 <code>void LRU_Append(LRUHandle* list, LRUHandle* e)</code></h4><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">void LRUCache::LRU_Append(LRUHandle* list, LRUHandle* e) &#123;
+  &#x2F;&#x2F; Make &quot;e&quot; newest entry by inserting just before *list
+  e-&gt;next &#x3D; list;
+  e-&gt;prev &#x3D; list-&gt;prev;
+  e-&gt;prev-&gt;next &#x3D; e;
+  e-&gt;next-&gt;prev &#x3D; e;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p><code>LRUHandle* list</code> is the head of linked list.</p>
+<h4 id="2-4-2-3-void-Ref-LRUHandle-e"><a href="#2-4-2-3-void-Ref-LRUHandle-e" class="headerlink" title="2.4.2.3 void Ref(LRUHandle* e)"></a>2.4.2.3 <code>void Ref(LRUHandle* e)</code></h4><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">void LRUCache::Ref(LRUHandle* e) &#123;
+  if (e-&gt;refs &#x3D;&#x3D; 1 &amp;&amp; e-&gt;in_cache) &#123;  &#x2F;&#x2F; If on lru_ list, move to in_use_ list.
+    LRU_Remove(e);
+    LRU_Append(&amp;in_use_, e);
+  &#125;
+  e-&gt;refs++;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h4 id="2-4-2-4-void-Unref-LRUHandle-e"><a href="#2-4-2-4-void-Unref-LRUHandle-e" class="headerlink" title="2.4.2.4 void Unref(LRUHandle* e)"></a>2.4.2.4 <code>void Unref(LRUHandle* e)</code></h4><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">void LRUCache::Unref(LRUHandle* e) &#123;
+  assert(e-&gt;refs &gt; 0);
+  e-&gt;refs--;
+  if (e-&gt;refs &#x3D;&#x3D; 0) &#123;  &#x2F;&#x2F; Deallocate.
+    assert(!e-&gt;in_cache);
+    (*e-&gt;deleter)(e-&gt;key(), e-&gt;value);
+    free(e);
+  &#125; else if (e-&gt;in_cache &amp;&amp; e-&gt;refs &#x3D;&#x3D; 1) &#123;
+    &#x2F;&#x2F; No longer in use; move to lru_ list.
+    LRU_Remove(e);
+    LRU_Append(&amp;lru_, e);
+  &#125;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<h4 id="2-4-2-5-LRUCache-Insert-const-Slice-amp-key-uint32-t-hash-void-value-size-t-charge-void-deleter-const-Slice-amp-key-void-value"><a href="#2-4-2-5-LRUCache-Insert-const-Slice-amp-key-uint32-t-hash-void-value-size-t-charge-void-deleter-const-Slice-amp-key-void-value" class="headerlink" title="2.4.2.5 LRUCache::Insert(const Slice&amp; key, uint32_t hash, void* value, size_t charge, void (*deleter)(const Slice&amp; key, void* value))"></a>2.4.2.5 <code>LRUCache::Insert(const Slice&amp; key, uint32_t hash, void* value, size_t charge, void (*deleter)(const Slice&amp; key, void* value))</code></h4><ol>
+<li>lock mutex_</li>
+<li>initialize LRUHandle<ol>
+<li>assign value</li>
+<li>copy <code>Slice</code> key data to <code>LRUHandle</code> e-&gt;key_data</li>
+</ol>
+</li>
+<li>if capacity is larger than 0, it means turning on caching<ol>
+<li>append e to the head of <code>in_use_</code> list</li>
+<li>insert e into <code>HandleTable</code> <code>table_</code> and the insertion return <code>nullptr</code></li>
+<li>the <code>nullptr</code> returned value passed in function <code>FinishErase</code></li>
+</ol>
+</li>
+<li>else assign <code>nullptr</code> to e-&gt;next</li>
+<li>while <code>usage_</code> is larger than <code>capacity_</code>, remove the first node from <code>lru_</code> and remove the node from <code>HandleTable</code> <code>table_</code></li>
+</ol>
+<h4 id="2-4-2-6-void-LRUCache-Erase-const-Slice-amp-key-uint32-t-hash"><a href="#2-4-2-6-void-LRUCache-Erase-const-Slice-amp-key-uint32-t-hash" class="headerlink" title="2.4.2.6 void LRUCache::Erase(const Slice&amp; key, uint32_t hash)"></a>2.4.2.6 <code>void LRUCache::Erase(const Slice&amp; key, uint32_t hash)</code></h4><ul>
+<li>erase element from <code>table_</code> and remove the node from cache.</li>
+</ul>
+<h4 id="2-4-2-7-void-LRUCache-Prune"><a href="#2-4-2-7-void-LRUCache-Prune" class="headerlink" title="2.4.2.7 void LRUCache::Prune()"></a>2.4.2.7 <code>void LRUCache::Prune()</code></h4><ul>
+<li>remove all nodes from <code>lru_</code>, <code>table_</code> and <code>in_use_</code></li>
+</ul>
+<h4 id="2-4-2-8-bool-FinishErase-LRUHandle-e"><a href="#2-4-2-8-bool-FinishErase-LRUHandle-e" class="headerlink" title="2.4.2.8 bool FinishErase(LRUHandle* e)"></a>2.4.2.8 <code>bool FinishErase(LRUHandle* e)</code></h4><ul>
+<li>if e is not <code>nullptr</code><ul>
+<li>remove e from <code>lru_</code></li>
+<li>clear e memory using <code>deleter</code> in function <code>Unref</code></li>
+</ul>
+</li>
+</ul>
+<p><strong>GUARDED_BY</strong></p>
+<p><code>GUARDED_BY</code> is an attribute on data members, which declares that the data member is protected by the given capability. Read operations on the data require shared access, while write operations require exclusive access.</p>
+<p><strong>EXCLUSIVE_LOCKS_REQUIRED</strong></p>
+<p><code>EXCLUSIVE_LOCKS_REQUIRED</code> is an attribute on functions or methods,<br>which declares that the calling thread must have exclusive access to the given capabilities.<br>More than one capability may be specified. The capabilities must be held on entry to the function,<br><em>and must still be held on exit</em>.</p>
+<p><strong>UNLOCK_FUNCTION</strong></p>
+<p><code>UNLOCK_FUNCTION</code> declares that the function releases the given capability.<br>The caller must hold the capability on entry, and will no longer hold it on exit.<br>It does not matter whether the given capability is shared or exclusive.</p>
+<p><strong>LOCKS_EXCLUDED</strong></p>
+<p><code>LOCKS_EXCLUDED</code> is an attribute on functions or methods, which declares that<br>the caller must <em>not</em> hold the given capabilities. This annotation is used to prevent deadlock.<br>Many mutex implementations are not re-entrant, so deadlock can occur<br>if the function in question acquires the mutex a second time</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#LevelDB-2-%E2%80%93-cache-%E7%BC%93%E5%AD%98%E6%9C%BA%E5%88%B6%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="toc-number">1.</span> <span class="toc-text">LevelDB (2) – cache 缓存机制源码分析</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-Module-Information"><span class="toc-number">1.1.</span> <span class="toc-text">1. Module Information</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-Components"><span class="toc-number">1.2.</span> <span class="toc-text">2. Components</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-Components-Overview"><span class="toc-number">1.3.</span> <span class="toc-text">2.1 Components Overview</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2-LRUHandle-struct"><span class="toc-number">1.4.</span> <span class="toc-text">2.2 LRUHandle struct</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-1-Variable-Explanation"><span class="toc-number">1.4.1.</span> <span class="toc-text">2.2.1 Variable Explanation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-2-Method-Explanation"><span class="toc-number">1.4.2.</span> <span class="toc-text">2.2.2 Method Explanation</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#2-2-2-1-function-Slice-key-const-public"><span class="toc-number">1.4.2.1.</span> <span class="toc-text">2.2.2.1 function Slice key() const - public</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-3-HandleTable-class"><span class="toc-number">1.5.</span> <span class="toc-text">2.3 HandleTable class</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-1-Variable-Explanation"><span class="toc-number">1.5.1.</span> <span class="toc-text">2.3.1 Variable Explanation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-2-Method-Explanation"><span class="toc-number">1.5.2.</span> <span class="toc-text">2.3.2 Method Explanation</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-1-function-LRUHandle-FindPointer-const-Slice-amp-key-uint32-t-hash-private"><span class="toc-number">1.5.2.1.</span> <span class="toc-text">2.3.2.1 function LRUHandle** FindPointer(const Slice&amp; key, uint32_t hash) - private</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-2-function-void-Resize-private"><span class="toc-number">1.5.2.2.</span> <span class="toc-text">2.3.2.2 function void Resize() - private</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-3-function-Insert-LRUHandle-h-public"><span class="toc-number">1.5.2.3.</span> <span class="toc-text">2.3.2.3 function Insert( LRUHandle* h) - public</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-3-2-4-function-Remove-LRUHandle-h-public"><span class="toc-number">1.5.2.4.</span> <span class="toc-text">2.3.2.4 function Remove( LRUHandle* h) - public</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-4-LRUCache-class"><span class="toc-number">1.6.</span> <span class="toc-text">2.4 LRUCache class</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-1-Variable-Explanation"><span class="toc-number">1.6.1.</span> <span class="toc-text">2.4.1 Variable Explanation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-2-Method-Explanation"><span class="toc-number">1.6.2.</span> <span class="toc-text">2.4.2 Method Explanation</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#Initialization"><span class="toc-number">1.6.2.1.</span> <span class="toc-text">Initialization</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Destruction"><span class="toc-number">1.6.2.2.</span> <span class="toc-text">Destruction</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-1-void-LRU-Remove-LRUHandle-e"><span class="toc-number">1.6.2.3.</span> <span class="toc-text">2.4.2.1 void LRU_Remove(LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-2-void-LRU-Append-LRUHandle-list-LRUHandle-e"><span class="toc-number">1.6.2.4.</span> <span class="toc-text">2.4.2.2 void LRU_Append(LRUHandle* list, LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-3-void-Ref-LRUHandle-e"><span class="toc-number">1.6.2.5.</span> <span class="toc-text">2.4.2.3 void Ref(LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-4-void-Unref-LRUHandle-e"><span class="toc-number">1.6.2.6.</span> <span class="toc-text">2.4.2.4 void Unref(LRUHandle* e)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-5-LRUCache-Insert-const-Slice-amp-key-uint32-t-hash-void-value-size-t-charge-void-deleter-const-Slice-amp-key-void-value"><span class="toc-number">1.6.2.7.</span> <span class="toc-text">2.4.2.5 LRUCache::Insert(const Slice&amp; key, uint32_t hash, void* value, size_t charge, void (*deleter)(const Slice&amp; key, void* value))</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-6-void-LRUCache-Erase-const-Slice-amp-key-uint32-t-hash"><span class="toc-number">1.6.2.8.</span> <span class="toc-text">2.4.2.6 void LRUCache::Erase(const Slice&amp; key, uint32_t hash)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-7-void-LRUCache-Prune"><span class="toc-number">1.6.2.9.</span> <span class="toc-text">2.4.2.7 void LRUCache::Prune()</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2-4-2-8-bool-FinishErase-LRUHandle-e"><span class="toc-number">1.6.2.10.</span> <span class="toc-text">2.4.2.8 bool FinishErase(LRUHandle* e)</span></a></li></ol></li></ol></li></ol></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&text=LevelDB (2) - cache 源码分析"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&is_video=false&description=LevelDB (2) - cache 源码分析"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=LevelDB (2) - cache 源码分析&body=Check out this article: http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&title=LevelDB (2) - cache 源码分析"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&name=LevelDB (2) - cache 源码分析&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/&t=LevelDB (2) - cache 源码分析"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2019-2021
+    Wong Chak Chau
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+ 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script> 
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script> 
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Umami Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>
