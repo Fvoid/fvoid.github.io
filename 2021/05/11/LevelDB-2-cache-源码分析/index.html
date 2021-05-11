@@ -13,14 +13,14 @@
 <meta property="og:site_name" content="hvoid code">
 <meta property="og:description" content="LevelDB (2) – cache 缓存机制源码分析LevelDB version 1.23 1. Module Informationutil&#x2F;cache.cc  2. Components2.1 Components Overview struct LRUHandle class HandleTable class LRUCache class SharedLRUCache  The ov">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png">
-<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_02.PNG">
-<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_03.PNG">
+<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png">
+<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_02.PNG">
+<meta property="og:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_03.PNG">
 <meta property="article:published_time" content="2021-05-11T15:41:19.000Z">
-<meta property="article:modified_time" content="2021-05-11T15:43:05.391Z">
+<meta property="article:modified_time" content="2021-05-11T16:02:29.410Z">
 <meta property="article:author" content="Wong Chak Chau">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png">
+<meta name="twitter:image" content="http://example.com/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png">
     
     
       
@@ -166,7 +166,7 @@
 <li>class <code>SharedLRUCache</code></li>
 </ul>
 <p>The overall relationship between them is shown in figure 1.</p>
-<p><img src="./LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_01.png"></p>
+<p><img src="cache_01.png"></p>
 <center>Figure 1. Data Structure Relationship Between LRUHandle and HandleTable</center>
 
 <p>The struct <code>LRUHandle</code> is the basic node for the cache element linked list. The <code>HandleTable</code> contains a list of <code>LRUHandle</code> linked list. The <code>LRUCache</code> class is to implement cache logic using <code>LRUHandle</code> and <code>HandleTable</code>. Thus, the actual cache logic is inside <code>LRUCache</code>.</p>
@@ -272,12 +272,12 @@
 <h4 id="2-3-2-3-function-Insert-LRUHandle-h-public"><a href="#2-3-2-3-function-Insert-LRUHandle-h-public" class="headerlink" title="2.3.2.3 function Insert( LRUHandle* h) - public"></a>2.3.2.3 function <code>Insert( LRUHandle* h)</code> - public</h4><ol>
 <li><p>find h in the table</p>
 </li>
-<li><p>when h is not in the table, then the <code>LRUHandle** ptr</code> will point to an address with <code>nullptr</code> value.<br><img src="./LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_02.PNG" alt="cache_02.PNG"></p>
+<li><p>when h is not in the table, then the <code>LRUHandle** ptr</code> will point to an address with <code>nullptr</code> value.<br><img src="cache_02.PNG" alt="cache_02.PNG"></p>
 </li>
 <li><p>put h ptr value to address <code>**ptr</code></p>
 </li>
 </ol>
-<p><img src="./LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/cache_03.PNG" alt="cache_03.PNG"></p>
+<p><img src="cache_03.PNG" alt="cache_03.PNG"></p>
 <ol start="4">
 <li>increment <code>elems_</code>, if <code>elemes &gt; length_</code>, do resize.</li>
 <li>when h is found with the key, it replaces found LRUHandle* with h.</li>
@@ -321,7 +321,7 @@
 <tr>
 <td align="center">table_</td>
 <td align="center"><code>HandleTable GUARDED_BY(mutex_)</code></td>
-<td align="left"></td>
+<td align="left">cache table</td>
 </tr>
 </tbody></table>
 <h3 id="2-4-2-Method-Explanation"><a href="#2-4-2-Method-Explanation" class="headerlink" title="2.4.2 Method Explanation"></a>2.4.2 Method Explanation</h3><h4 id="Initialization"><a href="#Initialization" class="headerlink" title="Initialization"></a>Initialization</h4><ul>
