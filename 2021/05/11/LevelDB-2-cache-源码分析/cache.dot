@@ -1,0 +1,44 @@
+digraph HandleTable {
+    HandleTable [
+        shape="record"
+        label="{HandleTable|
+            <s0> length_ : uint32_t, length of bucket list\l|
+            <s1> elems_ : uint32_t, total count of elements\l|
+            <s2> list_ : LRUHandle**, pointer to list of linked list\l}"
+    ];
+
+    list_ [
+        shape="record"
+        label="{<f0> LRUHandle* | LRUHandle* | LRUHandle* |...}"
+    ]
+
+    lru_handle [
+        shape="record"
+        label=" lru_handle | {void* value | 
+            void (*deleter)(const Slice&, void* value) |
+            <l0> LRUHandle* next_hash | 
+            <l1> LRUHandle* next | 
+            <l2> LRUHandle* prev |
+            size_t charge |
+            size_t key_length |
+            bool in_cache | 
+            uint32_t refs |
+            uint32_t hash |
+            char key_data[1]}"
+    ]
+
+    lru_prev [
+        shape="record"
+        label="lru_handle_prev | {...}"
+    ]
+
+    lru_next [
+        shape="record"
+        label="lru_handle_next | {...}"
+    ]
+
+    HandleTable:s2 -> list_
+    list_:f0 -> lru_handle
+    lru_handle:l1 -> lru_next
+    lru_handle:l2 -> lru_prev
+}

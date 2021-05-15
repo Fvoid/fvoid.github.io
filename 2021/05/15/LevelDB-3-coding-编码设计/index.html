@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="LevelDB version 1.23 1. Module Informationutil&#x2F;coding.hutil&#x2F;coding.cc 2. Components2.1 Overview&#x2F;&#x2F; Standard Put... routines append to a string void PutFixed32(std::string* dst, uint32_t value">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDB (3) - coding编码设计">
+<meta property="og:url" content="http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/index.html">
+<meta property="og:site_name" content="hvoid code">
+<meta property="og:description" content="LevelDB version 1.23 1. Module Informationutil&#x2F;coding.hutil&#x2F;coding.cc 2. Components2.1 Overview&#x2F;&#x2F; Standard Put... routines append to a string void PutFixed32(std::string* dst, uint32_t value">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Little-Endian.svg/200px-Little-Endian.svg.png">
+<meta property="article:published_time" content="2021-05-15T13:40:29.000Z">
+<meta property="article:modified_time" content="2021-05-15T13:46:08.669Z">
+<meta property="article:author" content="Wong Chak Chau">
+<meta property="article:tag" content="LevelDB">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Little-Endian.svg/200px-Little-Endian.svg.png">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>LevelDB (3) - coding编码设计</title>
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+		<script type="text/x-mathjax-config">
+		  MathJax.Hub.Config({
+			tex2jax: {
+			  skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+			  inlineMath: [['$','$']]
+			}
+		  });
+		</script>
+		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML' async></script>
+	
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" "Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li><a class="icon" aria-label="Previous post " href="/2021/05/15/LevelDB-4-bloom-filter-%E8%AE%BE%E8%AE%A1%E5%88%86%E6%9E%90/"><i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
+        
+        <li><a class="icon" aria-label="Next post " href="/2021/05/11/LevelDB-2-cache-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top " href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post " href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&text=LevelDB (3) - coding编码设计"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&is_video=false&description=LevelDB (3) - coding编码设计"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=LevelDB (3) - coding编码设计&body=Check out this article: http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&name=LevelDB (3) - coding编码设计&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&t=LevelDB (3) - coding编码设计"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-Module-Information"><span class="toc-number">1.</span> <span class="toc-text">1. Module Information</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-Components"><span class="toc-number">2.</span> <span class="toc-text">2. Components</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-Overview"><span class="toc-number">3.</span> <span class="toc-text">2.1 Overview</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2-Put-Operation"><span class="toc-number">4.</span> <span class="toc-text">2.2 Put Operation</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-3-Get-Operation"><span class="toc-number">5.</span> <span class="toc-text">2.3 Get Operation</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        LevelDB (3) - coding编码设计
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">Wong Chak Chau</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2021-05-15T13:40:29.000Z" itemprop="datePublished">2021-05-15</time>
+        
+      
+    </div>
+
+
+      
+
+      
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link-link" href="/tags/LevelDB/" rel="tag">LevelDB</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <p>LevelDB version 1.23</p>
+<h2 id="1-Module-Information"><a href="#1-Module-Information" class="headerlink" title="1. Module Information"></a>1. Module Information</h2><p><code>util/coding.h</code><br><code>util/coding.cc</code></p>
+<h2 id="2-Components"><a href="#2-Components" class="headerlink" title="2. Components"></a>2. Components</h2><h2 id="2-1-Overview"><a href="#2-1-Overview" class="headerlink" title="2.1 Overview"></a>2.1 Overview</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">&#x2F;&#x2F; Standard Put... routines append to a string
+void PutFixed32(std::string* dst, uint32_t value);
+void PutFixed64(std::string* dst, uint64_t value);
+void PutVarint32(std::string* dst, uint32_t value);
+void PutVarint64(std::string* dst, uint64_t value);
+void PutLengthPrefixedSlice(std::string* dst, const Slice&amp; value);
+
+&#x2F;&#x2F; Standard Get... routines parse a value from the beginning of a Slice
+&#x2F;&#x2F; and advance the slice past the parsed value.
+bool GetVarint32(Slice* input, uint32_t* value);
+bool GetVarint64(Slice* input, uint64_t* value);
+bool GetLengthPrefixedSlice(Slice* input, Slice* result);<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>The coding contains two main types of <code>Putxxxx</code> and <code>Getxxxx</code>.</p>
+<ul>
+<li>The <code>Putxxxx</code> is to convert <code>uint32_t</code> into byte array and append the byte array to data location of <code>string*</code>.</li>
+<li>The <code>Getxxxx</code> is to get large value from <code>slice</code> and store the result in <code>uint32_t* value</code></li>
+</ul>
+<h2 id="2-2-Put-Operation"><a href="#2-2-Put-Operation" class="headerlink" title="2.2 Put Operation"></a>2.2 <code>Put</code> Operation</h2><p>The encoding operation will encode the the value to <code>uint8_t</code> in the order of little-endian.</p>
+<p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Little-Endian.svg/200px-Little-Endian.svg.png" alt="little-endian"></p>
+<pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">char* EncodeVarint32(char* dst, uint32_t v) &#123;
+  &#x2F;&#x2F; Operate on characters as unsigneds
+  uint8_t* ptr &#x3D; reinterpret_cast&lt;uint8_t*&gt;(dst);
+  static const int B &#x3D; 128;
+  if (v &lt; (1 &lt;&lt; 7)) &#123;
+    *(ptr++) &#x3D; v;
+  &#125; else if (v &lt; (1 &lt;&lt; 14)) &#123;
+    *(ptr++) &#x3D; v | B;
+    *(ptr++) &#x3D; v &gt;&gt; 7;
+  &#125; else if (v &lt; (1 &lt;&lt; 21)) &#123;
+    *(ptr++) &#x3D; v | B;
+    *(ptr++) &#x3D; (v &gt;&gt; 7) | B;
+    *(ptr++) &#x3D; v &gt;&gt; 14;
+  &#125; else if (v &lt; (1 &lt;&lt; 28)) &#123;
+    *(ptr++) &#x3D; v | B;
+    *(ptr++) &#x3D; (v &gt;&gt; 7) | B;
+    *(ptr++) &#x3D; (v &gt;&gt; 14) | B;
+    *(ptr++) &#x3D; v &gt;&gt; 21;
+  &#125; else &#123;
+    *(ptr++) &#x3D; v | B;
+    *(ptr++) &#x3D; (v &gt;&gt; 7) | B;
+    *(ptr++) &#x3D; (v &gt;&gt; 14) | B;
+    *(ptr++) &#x3D; (v &gt;&gt; 21) | B;
+    *(ptr++) &#x3D; v &gt;&gt; 28;
+  &#125;
+  return reinterpret_cast&lt;char*&gt;(ptr);
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>The encoding ensures each <code>uint8_t</code> byte does not use highest bit for storing value. Thus, it will encode 7 bits at a time. The highest bit in a byte is an indicator of whether there are more bytes after this.</p>
+<h2 id="2-3-Get-Operation"><a href="#2-3-Get-Operation" class="headerlink" title="2.3 Get Operation"></a>2.3 <code>Get</code> Operation</h2><pre class="line-numbers language-c++" data-language="c++"><code class="language-c++">const char* GetVarint32PtrFallback(const char* p, const char* limit,
+                                   uint32_t* value) &#123;
+  uint32_t result &#x3D; 0;
+  for (uint32_t shift &#x3D; 0; shift &lt;&#x3D; 28 &amp;&amp; p &lt; limit; shift +&#x3D; 7) &#123;
+    uint32_t byte &#x3D; *(reinterpret_cast&lt;const uint8_t*&gt;(p));
+    p++;
+    if (byte &amp; 128) &#123;
+      &#x2F;&#x2F; More bytes are present
+      result |&#x3D; ((byte &amp; 127) &lt;&lt; shift);
+    &#125; else &#123;
+      result |&#x3D; (byte &lt;&lt; shift);
+      *value &#x3D; result;
+      return reinterpret_cast&lt;const char*&gt;(p);
+    &#125;
+  &#125;
+  return nullptr;
+&#125;<span aria-hidden="true" class="line-numbers-rows"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span></code></pre>
+
+<p>The code is obvious – it checks the highest bit of current byte for deciding when to stop parsing and return the value.</p>
+<p>努力！奋斗！</p>
+
+  </div>
+</article>
+
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-Module-Information"><span class="toc-number">1.</span> <span class="toc-text">1. Module Information</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-Components"><span class="toc-number">2.</span> <span class="toc-text">2. Components</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-1-Overview"><span class="toc-number">3.</span> <span class="toc-text">2.1 Overview</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-2-Put-Operation"><span class="toc-number">4.</span> <span class="toc-text">2.2 Put Operation</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-3-Get-Operation"><span class="toc-number">5.</span> <span class="toc-text">2.3 Get Operation</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&text=LevelDB (3) - coding编码设计"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&is_video=false&description=LevelDB (3) - coding编码设计"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=LevelDB (3) - coding编码设计&body=Check out this article: http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&title=LevelDB (3) - coding编码设计"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&name=LevelDB (3) - coding编码设计&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=http://example.com/2021/05/15/LevelDB-3-coding-%E7%BC%96%E7%A0%81%E8%AE%BE%E8%AE%A1/&t=LevelDB (3) - coding编码设计"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2019-2021
+    Wong Chak Chau
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects/">Projects</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+ 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script> 
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script> 
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Google Analytics -->
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NH0G6R51YX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-NH0G6R51YX');
+    </script>
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Umami Analytics -->
+
+<!-- Disqus Comments -->
+
+
+</body>
+</html>
